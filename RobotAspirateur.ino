@@ -2,10 +2,42 @@
 #include "aspiration.h"
 #include "batterie.h"
 #include "capteurs.h"
+#include "carte.h"
 #include "config.h"
 #include "debug.h"
+#include "imu.h"
 #include "moteurs.h"
 #include "navigation.h"
+#include "odometrie.h"
+#include "ultrasons.h"
+
+// Tâche de cartographie en arrière-plan (FreeRTOS)
+void tacheCartographie(void* parameter) {
+  for (;;) { // Boucle infinie
+    float dist = odometrieDistanceDepuisDerniereLectureCm();
+    float angle = imuLireYawRad();
+
+    // Met à jour la position sur la carte
+    carteIntegrerMesure(dist, angle);
+
+    // Regarde devant avec les ultrasons
+    float distanceObstacle = ultrasonsDistanceAvantCm();
+    if (distanceObstacle < 40.0f) {
+      carteMarquerObstacleDevant(distanceObstacle, angle);
+    }
+
+    if (DEBUG_ACTIF) {
+      PositionRobot pos = carteGetPosition();
+      String log = "[CARTO] x=" + String(pos.x, 1)
+                 + " y=" + String(pos.y, 1)
+                 + " angle=" + String(pos.angle, 2)
+                 + " dist_obstacle=" + String(distanceObstacle, 1);
+      debugLog(log);
+    }
+
+    vTaskDelay(50 / portTICK_PERIOD_MS); // Pause de 50ms (non-bloquante)
+  }
+}
 
 void appliquerAction(ActionNavigation action) {
   switch (action) {
@@ -17,21 +49,16 @@ void appliquerAction(ActionNavigation action) {
     case ActionNavigation::Reculer:
       moteursReculer();
       aspirationDemarrer();
-      delay(300);
-      moteursTournerDroite();
-      delay(DUREE_ROTATION_MS);
       break;
 
     case ActionNavigation::TournerGauche:
       moteursTournerGauche();
       aspirationDemarrer();
-      delay(DUREE_ROTATION_MS);
       break;
 
     case ActionNavigation::TournerDroite:
       moteursTournerDroite();
       aspirationDemarrer();
-      delay(DUREE_ROTATION_MS);
       break;
 
     case ActionNavigation::ArretSecurite:
@@ -42,14 +69,32 @@ void appliquerAction(ActionNavigation action) {
 }
 
 void setup() {
-  Serial.begin(9600);
-  debugLog("=== Démarrage Robot Aspirateur ===");
+  Serial.begin(115200); // L'ESP32 préfère 115200 à 9600
+  debugLog("=== Démarrage Robot Aspirateur Cartographe ===");
 
+  // 1. Initialisation de tous les modules
   moteursInit();
   aspirationInit();
-  capteursInit();
   batterieInit();
+  capteursInit();
+  odometrieInit();
+  imuInit();
+  ultrasonsInit();
+  carteInit();
   navigationInit();
+
+  // 2. Création de la tâche de cartographie (tourne en arrière-plan)
+  xTaskCreatePinnedToCore(
+    tacheCartographie,   // Fonction à exécuter
+    "Carto",             // Nom
+    4096,                // Taille de la pile en octets
+    NULL,                // Paramètres
+    1,                   // Priorité
+    NULL,                // Identifiant de tâche
+    0                    // Exécuté sur le Core 0
+  );
+
+  debugLog("=== Initialisation terminée, démarrage navigation ===");
 }
 
 void loop() {
@@ -67,5 +112,5 @@ void loop() {
     debugLog(log);
   }
 
-  delay(200);
+  vTaskDelay(200 / portTICK_PERIOD_MS); // Pause non-bloquante de 200ms
 }
