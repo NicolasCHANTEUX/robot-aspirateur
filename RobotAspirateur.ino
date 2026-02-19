@@ -1,17 +1,11 @@
 #include <Arduino.h>
 #include "aspiration.h"
 #include "batterie.h"
-#include "carte.h"
+#include "capteurs.h"
 #include "config.h"
 #include "debug.h"
-#include "imu.h"
 #include "moteurs.h"
 #include "navigation.h"
-#include "odometrie.h"
-#include "ultrasons.h"
-
-SemaphoreHandle_t g_mutexCarto = nullptr;
-volatile ActionNavigation g_actionCourante = ActionNavigation::ArretSecurite;
 
 void appliquerAction(ActionNavigation action) {
   switch (action) {
@@ -19,18 +13,27 @@ void appliquerAction(ActionNavigation action) {
       moteursAvancer();
       aspirationDemarrer();
       break;
+
     case ActionNavigation::Reculer:
       moteursReculer();
       aspirationDemarrer();
+      delay(300);
+      moteursTournerDroite();
+      delay(DUREE_ROTATION_MS);
       break;
+
     case ActionNavigation::TournerGauche:
       moteursTournerGauche();
       aspirationDemarrer();
+      delay(DUREE_ROTATION_MS);
       break;
+
     case ActionNavigation::TournerDroite:
       moteursTournerDroite();
       aspirationDemarrer();
+      delay(DUREE_ROTATION_MS);
       break;
+
     case ActionNavigation::ArretSecurite:
       moteursStop();
       aspirationArreter();
@@ -38,83 +41,31 @@ void appliquerAction(ActionNavigation action) {
   }
 }
 
-void TacheCartographie(void* /*pv*/) {
-  TickType_t prochainReveil = xTaskGetTickCount();
-  while (true) {
-    const float distance = odometrieDistanceDepuisDerniereLectureCm();
-    const float yaw = imuLireYawRad();
-    const float obstacleCm = ultrasonsDistanceAvantCm();
-
-    if (xSemaphoreTake(g_mutexCarto, pdMS_TO_TICKS(5)) == pdTRUE) {
-      carteIntegrerMesure(distance, yaw);
-      if (obstacleCm < 150.0f) {
-        carteMarquerObstacleDevant(obstacleCm, yaw);
-      }
-      xSemaphoreGive(g_mutexCarto);
-    }
-
-    vTaskDelayUntil(&prochainReveil, PERIODE_CARTO_TICKS);
-  }
-}
-
-void TacheNavigation(void* /*pv*/) {
-  TickType_t prochainReveil = xTaskGetTickCount();
-  while (true) {
-    PositionRobot pos = carteGetPosition();
-    bool batterieFaible = batterieEstFaible();
-    float obstacleCm = ultrasonsDistanceAvantCm();
-
-    if (xSemaphoreTake(g_mutexCarto, pdMS_TO_TICKS(5)) == pdTRUE) {
-      pos = carteGetPosition();
-      xSemaphoreGive(g_mutexCarto);
-    }
-
-    ActionNavigation action = navigationChoisirAction(pos, batterieFaible, obstacleCm);
-    g_actionCourante = action;
-    appliquerAction(action);
-
-    vTaskDelayUntil(&prochainReveil, PERIODE_NAV_TICKS);
-  }
-}
-
-void TacheCommunication(void* /*pv*/) {
-  TickType_t prochainReveil = xTaskGetTickCount();
-  while (true) {
-    PositionRobot pos = carteGetPosition();
-    if (xSemaphoreTake(g_mutexCarto, pdMS_TO_TICKS(5)) == pdTRUE) {
-      pos = carteGetPosition();
-      xSemaphoreGive(g_mutexCarto);
-    }
-
-    debugLog("[COMMS] x=" + String(pos.x, 1) + " y=" + String(pos.y, 1) + " yaw=" + String(pos.angle, 2));
-    vTaskDelayUntil(&prochainReveil, PERIODE_COMMS_TICKS);
-  }
-}
-
 void setup() {
-  Serial.begin(115200);
-  debugLog("=== ESP32 Robot Cartographe ===");
+  Serial.begin(9600);
+  debugLog("=== Démarrage Robot Aspirateur ===");
 
   moteursInit();
   aspirationInit();
+  capteursInit();
   batterieInit();
-  odometrieInit();
-  imuInit();
-  ultrasonsInit();
-  carteInit();
   navigationInit();
-
-  g_mutexCarto = xSemaphoreCreateMutex();
-
-  xTaskCreatePinnedToCore(TacheCartographie, "Carto", 4096, nullptr, 2, nullptr, 0);
-  xTaskCreatePinnedToCore(TacheCommunication, "Comms", 4096, nullptr, 1, nullptr, 1);
-  xTaskCreatePinnedToCore(TacheNavigation, "Nav", 4096, nullptr, 2, nullptr, 1);
 }
 
 void loop() {
-  if (batterieEstFaible()) {
-    g_actionCourante = ActionNavigation::ArretSecurite;
-    appliquerAction(ActionNavigation::ArretSecurite);
+  EtatCapteurs etat = capteursLire();
+  bool batterieFaible = batterieEstFaible();
+
+  ActionNavigation action = navigationChoisirAction(etat, batterieFaible);
+  appliquerAction(action);
+
+  if (DEBUG_ACTIF) {
+    String log = "[LOOP] obstacle=" + String(etat.obstacleDevant)
+               + " vide=" + String(etat.videDetecte)
+               + " tension=" + String(batterieLireTension(), 2)
+               + "V faible=" + String(batterieFaible);
+    debugLog(log);
   }
-  vTaskDelay(pdMS_TO_TICKS(1000));
+
+  delay(200);
 }
