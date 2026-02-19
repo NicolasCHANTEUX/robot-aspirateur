@@ -1,9 +1,14 @@
 #include <Arduino.h>
 #include "navigation.h"
 #include "debug.h"
+#include "config.h"
+
+// Variables pour mémoriser l'état en cours (Machine à États)
+ActionNavigation etatCourant = ActionNavigation::Avancer;
+unsigned long tempsDebutManoeuvre = 0;
 
 void navigationInit() {
-  debugLog("[NAVIGATION] Init OK");
+  debugLog("[NAVIGATION] Init OK - Machine à États activée");
 }
 
 ActionNavigation navigationChoisirAction(const EtatCapteurs& capteurs, bool batterieFaible) {
@@ -11,16 +16,33 @@ ActionNavigation navigationChoisirAction(const EtatCapteurs& capteurs, bool batt
     return ActionNavigation::ArretSecurite;
   }
 
+  unsigned long tempsActuel = millis();
+
+  // 1. Est-ce qu'on est DÉJÀ en train de faire une manœuvre prioritaire ?
+  if (etatCourant == ActionNavigation::Reculer || 
+      etatCourant == ActionNavigation::TournerGauche || 
+      etatCourant == ActionNavigation::TournerDroite) {
+    
+    // Si la manœuvre dure depuis moins de 600ms, on la continue !
+    if (tempsActuel - tempsDebutManoeuvre < DUREE_ROTATION_MS) {
+      return etatCourant;
+    }
+  }
+
+  // 2. Sinon, on lit les capteurs pour prendre une nouvelle décision
   if (capteurs.videDetecte) {
-    return ActionNavigation::Reculer;
+    etatCourant = ActionNavigation::Reculer;
+    tempsDebutManoeuvre = tempsActuel; // On lance le chrono !
+    return etatCourant;
   }
 
   if (capteurs.obstacleDevant) {
-    if ((millis() / 1000UL) % 2UL == 0UL) {
-      return ActionNavigation::TournerGauche;
-    }
-    return ActionNavigation::TournerDroite;
+    etatCourant = ((tempsActuel / 1000UL) % 2UL == 0UL) ? ActionNavigation::TournerGauche : ActionNavigation::TournerDroite;
+    tempsDebutManoeuvre = tempsActuel; // On lance le chrono !
+    return etatCourant;
   }
 
-  return ActionNavigation::Avancer;
+  // Si tout va bien, on avance
+  etatCourant = ActionNavigation::Avancer;
+  return etatCourant;
 }
