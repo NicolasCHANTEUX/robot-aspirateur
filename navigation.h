@@ -1,7 +1,7 @@
 #ifndef NAVIGATION_H
 #define NAVIGATION_H
 
-#include "carte.h"
+#include "capteurs.h"
 
 enum class ActionNavigation {
   Avancer,
@@ -12,6 +12,6 @@ enum class ActionNavigation {
 };
 
 void navigationInit();
-ActionNavigation navigationChoisirAction(const PositionRobot& pos, bool batterieFaible, float distanceObstacleCm);
+ActionNavigation navigationChoisirAction(const EtatCapteurs& capteurs, bool batterieFaible);
 
 #endif

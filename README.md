@@ -1,37 +1,196 @@
-# robot-aspirateur (ESP32 cartographe)
+# Présentation du projet – Robot aspirateur autonome
 
-Ce dépôt contient une base **modulaire Arduino/ESP32** orientée SLAM léger par grille d’occupation.
+## Architecture générale & approche logicielle
 
-## Architecture logicielle
+## 1️⃣ Objectif du projet
 
-- `RobotAspirateur.ino` : orchestration FreeRTOS (cartographie, navigation, communication)
-- `carte.*` : grille d’occupation en chunks + pose du robot
-- `odometrie.*` : encodeurs + ISR + conversion tics→distance
-- `imu.*` : lecture yaw (stub simulation prêt à brancher MPU6050/6500)
-- `ultrasons.*` : télémétrie obstacle avant (HC-SR04)
-- `navigation.*` : décision de mouvement à partir carte + obstacle + batterie
-- `moteurs.*`, `aspiration.*`, `batterie.*` : actionneurs et sécurité énergie
-- `config.h` : toutes les constantes matérielles / périodes de tâches
+Le projet consiste à concevoir un **robot aspirateur autonome**, comprenant :
 
-## Conception
+- un **système d’aspiration complet** (fente, chambre de déchets, filtres, turbine),
+- un **système de déplacement motorisé** (2 roues motrices),
+- une **alimentation sur batterie**,
+- et un **pilotage par microcontrôleur Arduino**.
 
-- Carte : `100 x 100` chunks (`5 cm/chunk`) => 10 000 cellules
-- Valeurs cellule : `0` inconnu, `1` libre, `2` obstacle
-- Mise à jour pose : trigonométrie (`x += d*cos(yaw)`, `y += d*sin(yaw)`)
-- Sans `delay()` bloquant dans le flux principal : multitâche via FreeRTOS
+Le développement est mené de manière **progressive et modulaire**, en séparant clairement :
 
-## Tâches FreeRTOS
+- la **conception mécanique**,
+- la **logique logicielle**,
+- et l’**intégration matérielle**.
 
-- `TacheCartographie` (50 Hz, core 0) : odométrie + IMU + ultrasons + update carte
-- `TacheNavigation` (20 Hz, core 1) : choisit l’action et pilote moteurs/aspiration
-- `TacheCommunication` (2 Hz, core 1) : publie l’état (actuellement Serial)
+## 2️⃣ Principe fondamental : séparer le logiciel du matériel
 
-## Mode simulation
+Un point clé du projet est de **coder avant même d’avoir les composants physiques**.
 
-`MODE_SIMULATION=true` permet d’exécuter la logique sans capteurs réels.
-Quand le matériel est prêt, remplacez progressivement les stubs dans `imu.cpp` / `ultrasons.cpp` et ajustez `config.h`.
+Pour cela :
 
+- on écrit le programme comme si le robot existait déjà,
+- on remplace temporairement les composants par des **fonctions simulées**,
+- et le jour où les composants arrivent, on adapte uniquement le code bas niveau (pins, lectures, commandes).
 
-## Odométrie (important)
+👉 Cela permet :
 
-Les encodeurs sont lus en **quadrature** : phase A en interruption, phase B pour déduire le sens (avance/recul).
+- de gagner du temps,
+- d’avoir un code propre et professionnel,
+- d’éviter de tout refaire à la fin.
+
+## 3️⃣ Environnement de développement
+
+- **Microcontrôleur** : Arduino (Uno, Nano ou équivalent)
+- **Langage** : C++ Arduino
+- **IDE** : Arduino IDE
+
+Le langage Arduino est du C++ simplifié, parfaitement adapté à un projet robotique modulaire.
+
+## 4️⃣ Vision globale du fonctionnement du robot
+
+Le robot fonctionne selon une **boucle de contrôle continue** :
+
+1. Initialisation des composants
+2. Lecture des capteurs
+3. Prise de décision
+4. Action sur les moteurs et l’aspiration
+5. Vérification de la batterie
+6. Répétition de la boucle
+
+C’est ce qu’on appelle une **machine à états**.
+
+## 5️⃣ Architecture logicielle (modulaire)
+
+Le projet est découpé en **modules indépendants**, chacun responsable d’une fonction précise.
+
+### Structure logique du projet
+
+```text
+RobotAspirateur/
+│
+├── RobotAspirateur.ino   → programme principal (cerveau)
+│
+├── config.h              → constantes globales (pins, seuils)
+│
+├── moteurs.h / moteurs.cpp
+├── aspiration.h / aspiration.cpp
+├── capteurs.h / capteurs.cpp
+├── batterie.h / batterie.cpp
+├── navigation.h / navigation.cpp
+└── debug.h
+```
+
+Chaque module :
+
+- a une responsabilité unique,
+- peut être développé et testé indépendamment,
+- peut évoluer sans casser le reste du projet.
+
+## 6️⃣ Programme principal (cerveau du robot)
+
+Le fichier principal ne contient **aucune logique complexe**.
+Il se contente de :
+
+- démarrer les modules,
+- appeler les fonctions principales dans la boucle.
+
+Exemple de logique :
+
+- initialiser moteurs, aspiration, capteurs, batterie ;
+- dans la boucle :
+  - lire les capteurs,
+  - décider du comportement,
+  - piloter les moteurs,
+  - activer ou non l’aspiration,
+  - surveiller la batterie.
+
+👉 Cela rend le code **très lisible et maintenable**.
+
+## 7️⃣ Modules fonctionnels
+
+### 🔹 Module moteurs
+
+Responsable du déplacement :
+
+- avancer,
+- reculer,
+- tourner à gauche / droite,
+- s’arrêter.
+
+La logique de déplacement est indépendante du câblage réel.
+
+### 🔹 Module aspiration
+
+Responsable du système d’aspiration :
+
+- démarrage / arrêt de la turbine,
+- (plus tard) gestion de puissance,
+- (plus tard) sécurité si filtre bouché ou batterie faible.
+
+C’est un module central du projet.
+
+### 🔹 Module capteurs
+
+Regroupe toutes les entrées :
+
+- détection d’obstacles,
+- détection de vide,
+- autres capteurs futurs.
+
+Même sans capteurs réels, les fonctions peuvent être simulées.
+
+### 🔹 Module batterie
+
+Gère l’énergie :
+
+- lecture de la tension,
+- détection de batterie faible,
+- déclenchement de sécurités (arrêt aspiration, arrêt moteurs).
+
+### 🔹 Module navigation (logique décisionnelle)
+
+Décide :
+
+- quand avancer,
+- quand tourner,
+- quand s’arrêter,
+- comment réagir aux obstacles.
+
+Il utilise les informations des capteurs, mais ne dépend pas de leur implémentation physique.
+
+## 8️⃣ Simulation avant intégration
+
+Avant d’avoir le robot :
+
+- les fonctions capteurs retournent des valeurs fixes ou simulées,
+- les moteurs n’actionnent rien physiquement,
+- mais **toute la logique est déjà écrite et testée**.
+
+Le jour de l’intégration :
+
+- on remplace la simulation par le vrai code matériel,
+- sans toucher à l’architecture globale.
+
+## 9️⃣ Philosophie du projet
+
+Ce projet est conçu comme un **vrai projet d’ingénierie** :
+
+- structuré,
+- évolutif,
+- compréhensible par un tiers,
+- prêt à être amélioré (retour à la base, cartographie, etc.).
+
+Chaque choix vise :
+
+- la clarté,
+- la fiabilité,
+- et la montée en compétence.
+
+## 🔚 Conclusion
+
+Le robot aspirateur est pensé comme :
+
+- un **système modulaire complet**,
+- piloté par une **architecture logicielle propre**,
+- permettant de travailler en parallèle sur la mécanique, l’électronique et le code.
+
+Cette approche garantit un projet :
+
+- réaliste,
+- pédagogique,
+- et professionnel.

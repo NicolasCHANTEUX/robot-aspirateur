@@ -1,29 +1,26 @@
 #include <Arduino.h>
 #include "navigation.h"
+#include "debug.h"
 
 void navigationInit() {
+  debugLog("[NAVIGATION] Init OK");
 }
 
-ActionNavigation navigationChoisirAction(const PositionRobot& pos, bool batterieFaible, float distanceObstacleCm) {
+ActionNavigation navigationChoisirAction(const EtatCapteurs& capteurs, bool batterieFaible) {
   if (batterieFaible) {
     return ActionNavigation::ArretSecurite;
   }
 
-  if (distanceObstacleCm < 20.0f) {
+  if (capteurs.videDetecte) {
     return ActionNavigation::Reculer;
   }
 
-  if (distanceObstacleCm < 40.0f) {
-    return ((millis() / 1000UL) % 2UL == 0UL)
-      ? ActionNavigation::TournerGauche
-      : ActionNavigation::TournerDroite;
+  if (capteurs.obstacleDevant) {
+    if ((millis() / 1000UL) % 2UL == 0UL) {
+      return ActionNavigation::TournerGauche;
+    }
+    return ActionNavigation::TournerDroite;
   }
 
-  int chunkX = static_cast<int>(pos.x / TAILLE_CHUNK_CM);
-  int chunkY = static_cast<int>(pos.y / TAILLE_CHUNK_CM);
-  if (carteLireCase(chunkX + 1, chunkY) == static_cast<uint8_t>(TypeCase::Inconnu)) {
-    return ActionNavigation::Avancer;
-  }
-
-  return ActionNavigation::TournerDroite;
+  return ActionNavigation::Avancer;
 }
