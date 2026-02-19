@@ -19,10 +19,17 @@ ActionNavigation navigationChoisirAction(const EtatCapteurs& capteurs, bool batt
   unsigned long tempsActuel = millis();
 
   // 1. Est-ce qu'on est DÉJÀ en train de faire une manœuvre prioritaire ?
-  if (etatCourant == ActionNavigation::Reculer || 
-      etatCourant == ActionNavigation::TournerGauche || 
-      etatCourant == ActionNavigation::TournerDroite) {
-    
+  if (etatCourant == ActionNavigation::Reculer) {
+    // Séquence Anti-Vide : Reculer 300ms, PUIS Tourner 600ms
+    unsigned long duree = tempsActuel - tempsDebutManoeuvre;
+    if (duree < 300) {
+      return ActionNavigation::Reculer;
+    } else if (duree < 300 + DUREE_ROTATION_MS) {
+      return ActionNavigation::TournerDroite; // On force la rotation après le recul !
+    }
+  } 
+  else if (etatCourant == ActionNavigation::TournerGauche || 
+           etatCourant == ActionNavigation::TournerDroite) {
     // Si la manœuvre dure depuis moins de 600ms, on la continue !
     if (tempsActuel - tempsDebutManoeuvre < DUREE_ROTATION_MS) {
       return etatCourant;

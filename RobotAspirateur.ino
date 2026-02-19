@@ -11,6 +11,9 @@
 #include "odometrie.h"
 #include "ultrasons.h"
 
+// Mutex FreeRTOS pour protéger l'accès au port Serial (multicœur)
+SemaphoreHandle_t mutexSerial = NULL;
+
 // Tâche de cartographie en arrière-plan (FreeRTOS)
 void tacheCartographie(void* parameter) {
   for (;;) { // Boucle infinie
@@ -70,6 +73,10 @@ void appliquerAction(ActionNavigation action) {
 
 void setup() {
   Serial.begin(115200); // L'ESP32 préfère 115200 à 9600
+  
+  // Création du Mutex pour protéger le port Serial (accès concurrent des 2 cores)
+  mutexSerial = xSemaphoreCreateMutex();
+  
   debugLog("=== Démarrage Robot Aspirateur Cartographe ===");
 
   // 1. Initialisation de tous les modules
