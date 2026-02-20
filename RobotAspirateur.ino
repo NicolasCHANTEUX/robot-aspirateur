@@ -3,6 +3,7 @@
 #include "batterie.h"
 #include "capteurs.h"
 #include "carte.h"
+#include "communication.h"
 #include "config.h"
 #include "debug.h"
 #include "imu.h"
@@ -36,6 +37,9 @@ void tacheCartographie(void* parameter) {
                  + " angle=" + String(pos.angle, 2)
                  + " dist_obstacle=" + String(distanceObstacle, 1);
       debugLog(log);
+      
+      // Envoi des données en direct au téléphone !
+      communicationEnvoyerMiseAJour(pos, distanceObstacle);
     }
 
     vTaskDelay(50 / portTICK_PERIOD_MS); // Pause de 50ms (non-bloquante)
@@ -88,6 +92,7 @@ void setup() {
   imuInit();
   ultrasonsInit();
   carteInit();
+  communicationInit(); // Lance le Wi-Fi et l'App Web
   navigationInit();
 
   // 2. Création de la tâche de cartographie (tourne en arrière-plan)

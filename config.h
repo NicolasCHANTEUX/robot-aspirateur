@@ -46,4 +46,8 @@ constexpr float TICS_PAR_TOUR = 334.0f;    // Dépend de tes moteurs JGA25-370
 constexpr int PIN_US_TRIG_AVANT = 12;
 constexpr int PIN_US_ECHO_AVANT = 13;
 
+// --- Paramètres Wi-Fi (Pour l'application Web)
+constexpr char WIFI_SSID[] = "Nom_De_Votre_Box_WiFi";
+constexpr char WIFI_PASSWORD[] = "Votre_Mot_De_Passe";
+
 #endif
