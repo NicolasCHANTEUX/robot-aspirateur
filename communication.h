@@ -5,5 +5,6 @@
 
 void communicationInit();
 void communicationEnvoyerMiseAJour(PositionRobot pos, float distanceObstacle);
+void communicationCleanupClients();
 
 #endif

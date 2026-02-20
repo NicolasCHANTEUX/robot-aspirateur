@@ -30,17 +30,19 @@ void tacheCartographie(void* parameter) {
       carteMarquerObstacleDevant(distanceObstacle, angle);
     }
 
+    // On récupère TOUJOURS la position
+    PositionRobot pos = carteGetPosition();
+
     if (DEBUG_ACTIF) {
-      PositionRobot pos = carteGetPosition();
       String log = "[CARTO] x=" + String(pos.x, 1)
                  + " y=" + String(pos.y, 1)
                  + " angle=" + String(pos.angle, 2)
                  + " dist_obstacle=" + String(distanceObstacle, 1);
       debugLog(log);
-      
-      // Envoi des données en direct au téléphone !
-      communicationEnvoyerMiseAJour(pos, distanceObstacle);
     }
+    
+    // On envoie TOUJOURS les données en direct au téléphone !
+    communicationEnvoyerMiseAJour(pos, distanceObstacle);
 
     vTaskDelay(50 / portTICK_PERIOD_MS); // Pause de 50ms (non-bloquante)
   }
@@ -110,6 +112,9 @@ void setup() {
 }
 
 void loop() {
+  // Nettoie la mémoire des anciens téléphones déconnectés
+  communicationCleanupClients();
+  
   EtatCapteurs etat = capteursLire();
   bool batterieFaible = batterieEstFaible();
 

@@ -115,3 +115,8 @@ void communicationEnvoyerMiseAJour(PositionRobot pos, float distanceObstacle) {
     ws.textAll(payload);
   }
 }
+
+// Fonction pour nettoyer les clients déconnectés (économise la RAM)
+void communicationCleanupClients() {
+  ws.cleanupClients();
+}
