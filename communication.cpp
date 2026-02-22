@@ -11,6 +11,9 @@
 AsyncWebServer server(80);
 AsyncWebSocket ws("/ws");
 
+// État global du robot (contrôlé par l'interface Web)
+volatile bool robotEnMarche = true;
+
 // L'INTERFACE WEB (HTML + JavaScript embarqué) - Version Premium
 const char index_html[] PROGMEM = R"rawliteral(
 <!DOCTYPE HTML><html>
@@ -147,6 +150,14 @@ const char index_html[] PROGMEM = R"rawliteral(
       robotData = data;
       path.push({ x: data.rx, y: data.ry });
       if (path.length > 500) path.shift();
+      
+      // Mise à jour de la batterie
+      if (data.bat !== undefined) {
+        const batteryEl = document.getElementById("battery");
+        batteryEl.style.width = data.bat + "%";
+        if (data.bat < 30) batteryEl.classList.add("low");
+        else batteryEl.classList.remove("low");
+      }
       
       if (data.obs_dist > 0 && data.obs_dist < 40) {
         let ox = data.rx + data.obs_dist * Math.cos(data.ra);
@@ -288,6 +299,33 @@ void communicationInit() {
   
   debugLog("\n[WIFI] Connecté ! Adresse IP : " + WiFi.localIP().toString());
 
+  // Gestionnaire d'événements WebSocket (réception des commandes)
+  ws.onEvent([](AsyncWebSocket *server, AsyncWebSocketClient *client, AwsEventType type,
+                void *arg, uint8_t *data, size_t len) {
+    if (type == WS_EVT_DATA) {
+      AwsFrameInfo *info = (AwsFrameInfo*)arg;
+      if (info->final && info->index == 0 && info->len == len && info->opcode == WS_TEXT) {
+        data[len] = 0;
+        String message = String((char*)data);
+        
+        // Parsing du JSON reçu
+        StaticJsonDocument<64> doc;
+        DeserializationError error = deserializeJson(doc, message);
+        
+        if (!error && doc.containsKey("command")) {
+          String cmd = doc["command"];
+          if (cmd == "start") {
+            robotEnMarche = true;
+            debugLog("[WEB] Commande: DÉMARRER");
+          } else if (cmd == "stop") {
+            robotEnMarche = false;
+            debugLog("[WEB] Commande: ARRÊT");
+          }
+        }
+      }
+    }
+  });
+
   // Quand on tape l'adresse IP, envoyer la page HTML
   server.on("/", HTTP_GET, [](AsyncWebServerRequest *request){
     request->send_P(200, "text/html", index_html);
@@ -300,15 +338,16 @@ void communicationInit() {
 }
 
 // Fonction appelée par tacheCartographie pour diffuser les données
-void communicationEnvoyerMiseAJour(PositionRobot pos, float distanceObstacle) {
+void communicationEnvoyerMiseAJour(PositionRobot pos, float distanceObstacle, float niveauBatterie) {
   // S'il y a au moins un téléphone connecté à la page
   if (ws.count() > 0) {
     // On prépare un message JSON formaté
-    StaticJsonDocument<128> doc;
+    StaticJsonDocument<192> doc;
     doc["rx"] = pos.x;        // Robot X
     doc["ry"] = pos.y;        // Robot Y
     doc["ra"] = pos.angle;    // Robot Angle (Radians)
     doc["obs_dist"] = distanceObstacle; // Distance ultrasons
+    doc["bat"] = niveauBatterie; // Niveau batterie (0-100%)
     
     String payload;
     serializeJson(doc, payload);
@@ -316,6 +355,11 @@ void communicationEnvoyerMiseAJour(PositionRobot pos, float distanceObstacle) {
     // On l'envoie à tous les clients connectés !
     ws.textAll(payload);
   }
+}
+
+// Fonction pour savoir si le robot doit fonctionner
+bool communicationRobotEnMarche() {
+  return robotEnMarche;
 }
 
 // Fonction pour nettoyer les clients déconnectés (économise la RAM)

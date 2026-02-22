@@ -32,17 +32,24 @@ void tacheCartographie(void* parameter) {
 
     // On récupère TOUJOURS la position
     PositionRobot pos = carteGetPosition();
+    
+    // Calcul du niveau de batterie en pourcentage (0-100%)
+    float tensionBatterie = batterieLireTension();
+    float niveauBatterie = ((tensionBatterie - BATTERIE_TENSION_MIN) / 
+                            (BATTERIE_TENSION_MAX - BATTERIE_TENSION_MIN)) * 100.0f;
+    niveauBatterie = constrain(niveauBatterie, 0.0f, 100.0f);
 
     if (DEBUG_ACTIF) {
       String log = "[CARTO] x=" + String(pos.x, 1)
                  + " y=" + String(pos.y, 1)
                  + " angle=" + String(pos.angle, 2)
-                 + " dist_obstacle=" + String(distanceObstacle, 1);
+                 + " dist_obstacle=" + String(distanceObstacle, 1)
+                 + " bat=" + String(niveauBatterie, 0) + "%";
       debugLog(log);
     }
     
-    // On envoie TOUJOURS les données en direct au téléphone !
-    communicationEnvoyerMiseAJour(pos, distanceObstacle);
+    // On envoie TOUJOURS les données en direct au téléphone (avec la batterie) !
+    communicationEnvoyerMiseAJour(pos, distanceObstacle, niveauBatterie);
 
     vTaskDelay(50 / portTICK_PERIOD_MS); // Pause de 50ms (non-bloquante)
   }
@@ -114,6 +121,14 @@ void setup() {
 void loop() {
   // Nettoie la mémoire des anciens téléphones déconnectés
   communicationCleanupClients();
+  
+  // Vérifie si le robot est autorisé à fonctionner (contrôle depuis l'interface Web)
+  if (!communicationRobotEnMarche()) {
+    moteursStop();
+    aspirationArreter();
+    vTaskDelay(200 / portTICK_PERIOD_MS);
+    return; // Ne rien faire tant que l'utilisateur n'a pas cliqué sur "Démarrer"
+  }
   
   EtatCapteurs etat = capteursLire();
   bool batterieFaible = batterieEstFaible();
