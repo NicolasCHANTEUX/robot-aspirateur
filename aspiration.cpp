@@ -23,6 +23,7 @@ void aspirationDemarrer(int puissance) {
 }
 
 void aspirationArreter() {
+  if (!g_aspirationActive) return; // Si déjà arrêté, on ignore !
   g_aspirationActive = false;
   if (MODE_SIMULATION) {
     debugLog("[SIM][ASPIRATION] Arrêter");

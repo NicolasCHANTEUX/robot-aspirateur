@@ -4,6 +4,8 @@
 #include "moteurs.h"
 
 namespace {
+bool g_moteursActifs = false; // État global des moteurs
+
 void ecrireMoteur(int pinAvant, int pinArriere, int valeurAvant, int valeurArriere) {
   analogWrite(pinAvant, constrain(valeurAvant, 0, 255));
   analogWrite(pinArriere, constrain(valeurArriere, 0, 255));
@@ -20,6 +22,7 @@ void moteursInit() {
 }
 
 void moteursAvancer(int vitesse) {
+  g_moteursActifs = true;
   if (MODE_SIMULATION) {
     debugLog("[SIM][MOTEURS] Avancer");
     return;
@@ -29,6 +32,7 @@ void moteursAvancer(int vitesse) {
 }
 
 void moteursReculer(int vitesse) {
+  g_moteursActifs = true;
   if (MODE_SIMULATION) {
     debugLog("[SIM][MOTEURS] Reculer");
     return;
@@ -38,6 +42,7 @@ void moteursReculer(int vitesse) {
 }
 
 void moteursTournerGauche(int vitesse) {
+  g_moteursActifs = true;
   if (MODE_SIMULATION) {
     debugLog("[SIM][MOTEURS] Tourner gauche");
     return;
@@ -47,6 +52,7 @@ void moteursTournerGauche(int vitesse) {
 }
 
 void moteursTournerDroite(int vitesse) {
+  g_moteursActifs = true;
   if (MODE_SIMULATION) {
     debugLog("[SIM][MOTEURS] Tourner droite");
     return;
@@ -56,6 +62,8 @@ void moteursTournerDroite(int vitesse) {
 }
 
 void moteursStop() {
+  if (!g_moteursActifs) return; // Si déjà arrêtés, on ignore !
+  g_moteursActifs = false;
   if (MODE_SIMULATION) {
     debugLog("[SIM][MOTEURS] Stop");
     return;
