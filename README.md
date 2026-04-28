@@ -58,7 +58,7 @@ C’est ce qu’on appelle une **machine à états**.
 
 Le projet est découpé en **modules indépendants**, chacun responsable d’une fonction précise.
 
-### Structure logique du projet
+### Structure logique du projet 
 
 ```text
 RobotAspirateur/
