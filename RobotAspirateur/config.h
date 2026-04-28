@@ -53,7 +53,12 @@ constexpr int PIN_US_TRIG_AVANT = 4;
 constexpr int PIN_US_ECHO_AVANT = 5;
 
 // --- Paramètres Wi-Fi (Pour l'application Web)
-constexpr char WIFI_SSID[] = "HONOR WIFI 6_2.4GHz";
-constexpr char WIFI_PASSWORD[] = "12345678";
+constexpr char WIFI_SSID[] = "Nom_De_Votre_Box_WiFi";
+constexpr char WIFI_PASSWORD[] = "Votre_Mot_De_Passe";
+
+// --- Paramètres navigation Mode 3 (Nettoyage – Boustrophédon)
+constexpr float SEUIL_WAYPOINT_CM  = 15.0f; // Distance pour considérer un waypoint atteint
+constexpr float SEUIL_ROTATION_RAD = 0.30f; // Erreur angulaire max avant de corriger la direction
+constexpr int   MAX_WAYPOINTS_NETTOYAGE = 200; // Max waypoints (2 × LONGUEUR_CARTE)
 
 #endif
