@@ -3,9 +3,11 @@
 #include "debug.h"
 #include "config.h"
 
+namespace {
 // Variables pour mémoriser l'état en cours (Machine à États)
 ActionNavigation etatCourant = ActionNavigation::Avancer;
 unsigned long tempsDebutManoeuvre = 0;
+}
 
 void navigationInit() {
   debugLog("[NAVIGATION] Init OK - Machine à États activée");

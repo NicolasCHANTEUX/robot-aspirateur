@@ -16,7 +16,7 @@ float batterieLireTension() {
   }
 
   int valeurBrute = analogRead(PIN_BATTERIE);
-  float tension = (valeurBrute / 1023.0f) * BATTERIE_TENSION_MAX;
+  float tension = (valeurBrute / 4095.0f) * BATTERIE_TENSION_MAX;
   return tension;
 }
 

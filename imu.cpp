@@ -8,10 +8,12 @@
 
 Adafruit_MPU6050 mpu;
 
+namespace {
 // Variables pour calculer l'angle
 float angleYaw = 0.0f;
 unsigned long tempsPrecedent = 0;
 float erreurGyroZ = 0.0f; // Pour corriger la dérive naturelle du capteur
+}
 
 void imuInit() {
   if (MODE_SIMULATION) {
