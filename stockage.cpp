@@ -20,7 +20,7 @@ static String cheminFichier(const char* nomPiece) {
 
 void stockageInit() {
   if (!LittleFS.begin(true)) {
-    debugLog("[STOCKAGE] ERREUR: LittleFS impossible a demarrer !");
+    debugLog("[STOCKAGE] ERREUR: LittleFS impossible à démarrer !");
     return;
   }
   // Crée le dossier /maps s'il n'existe pas encore
@@ -34,7 +34,7 @@ bool stockageSauvegarderCarte(const char* nomPiece) {
   String chemin = cheminFichier(nomPiece);
   File f = LittleFS.open(chemin, "w");
   if (!f) {
-    debugLog("[STOCKAGE] ERREUR: impossible de creer " + chemin);
+    debugLog("[STOCKAGE] ERREUR: impossible de créer " + chemin);
     return false;
   }
 
@@ -54,7 +54,7 @@ bool stockageSauvegarderCarte(const char* nomPiece) {
   }
 
   f.close();
-  debugLog("[STOCKAGE] Carte sauvegardee : " + chemin);
+  debugLog("[STOCKAGE] Carte sauvegardée : " + chemin);
   return true;
 }
 
@@ -88,7 +88,7 @@ bool stockageChargerCarte(const char* nomPiece) {
   }
 
   f.close();
-  debugLog("[STOCKAGE] Carte chargee : " + chemin);
+  debugLog("[STOCKAGE] Carte chargée : " + chemin);
   return true;
 }
 

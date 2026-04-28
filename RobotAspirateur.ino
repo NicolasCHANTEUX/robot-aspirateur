@@ -106,7 +106,7 @@ void setup() {
   Serial.begin(115200);
   mutexSerial = xSemaphoreCreateMutex();
 
-  debugLog("=== Demarrage Robot Aspirateur Cartographe ===");
+  debugLog("=== Démarrage Robot Aspirateur Cartographe ===");
 
   moteursInit();
   aspirationInit();
@@ -125,7 +125,7 @@ void setup() {
     4096, NULL, 1, NULL, 0
   );
 
-  debugLog("=== Initialisation terminee, en attente d'ordres ===");
+  debugLog("=== Initialisation terminée, en attente d'ordres ===");
 }
 
 // -----------------------------------------------------------------------
@@ -145,7 +145,7 @@ void loop() {
   if (communicationChargerDemande(nomPiece, sizeof(nomPiece))) {
     if (stockageChargerCarte(nomPiece)) {
       navigationInitNettoyage();
-      debugLog("[MAIN] Carte chargee et parcours calcule : " + String(nomPiece));
+      debugLog("[MAIN] Carte chargée et parcours calculé : " + String(nomPiece));
     }
     communicationAcquitterChargement();
   }
@@ -196,7 +196,7 @@ void loop() {
         moteursStop();
         aspirationArreter();
         communicationSetMode(ModeRobot::Veille);
-        debugLog("[MAIN] Nettoyage termine ! Retour en veille.");
+        debugLog("[MAIN] Nettoyage terminé ! Retour en veille.");
       } else {
         PositionRobot pos    = carteGetPosition();
         ActionNavigation action =

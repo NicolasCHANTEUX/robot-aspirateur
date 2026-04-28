@@ -241,7 +241,7 @@ const char index_html[] PROGMEM = R"rawliteral(
 // Gestionnaire d'événements WebSocket
 // ======================================================================
 void communicationInit() {
-  debugLog("[WIFI] Connexion a " + String(WIFI_SSID));
+  debugLog("[WIFI] Connexion à " + String(WIFI_SSID));
 
   WiFi.mode(WIFI_STA);
   WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
@@ -250,7 +250,7 @@ void communicationInit() {
     delay(500);
     Serial.print(".");
   }
-  debugLog("\n[WIFI] Connecte ! Adresse IP : " + WiFi.localIP().toString());
+  debugLog("\n[WIFI] Connecté ! Adresse IP : " + WiFi.localIP().toString());
 
   ws.onEvent([](AsyncWebSocket* server, AsyncWebSocketClient* client,
                 AwsEventType type, void* arg, uint8_t* data, size_t len) {
@@ -287,7 +287,7 @@ void communicationInit() {
           if (nom.length() > 0 && nom.length() < 32) {
             nom.toCharArray(nomSauvegarde, sizeof(nomSauvegarde));
             flagSauvegarder = true;
-            debugLog("[WEB] Sauvegarde demandee : " + nom);
+            debugLog("[WEB] Sauvegarde demandée : " + nom);
           }
 
         } else if (cmd == "load_map") {
@@ -296,7 +296,7 @@ void communicationInit() {
           if (nom.length() > 0 && nom.length() < 32) {
             nom.toCharArray(nomChargement, sizeof(nomChargement));
             flagCharger = true;
-            debugLog("[WEB] Chargement demande : " + nom);
+            debugLog("[WEB] Chargement demandé : " + nom);
           }
 
         } else if (cmd == "list_maps") {
@@ -312,7 +312,7 @@ void communicationInit() {
 
   server.addHandler(&ws);
   server.begin();
-  debugLog("[WEBSOCKET] Serveur demarre");
+  debugLog("[WEBSOCKET] Serveur démarré");
 }
 
 // ======================================================================

@@ -25,7 +25,7 @@ int g_indexWaypoint = 0;
 // ======================================================================
 
 void navigationInit() {
-  debugLog("[NAVIGATION] Init OK - Machine a Etats activee");
+  debugLog("[NAVIGATION] Init OK - Machine à États activée");
 }
 
 void navigationReset() {
@@ -113,7 +113,7 @@ void navigationInitNettoyage() {
     }
   }
 
-  debugLog("[NAVIGATION] Nettoyage : " + String(g_nbWaypoints) + " waypoints calcules");
+  debugLog("[NAVIGATION] Nettoyage : " + String(g_nbWaypoints) + " waypoints calculés");
 }
 
 bool navigationNettoyageFini() {
@@ -138,21 +138,21 @@ ActionNavigation navigationChoisirActionNettoyage(PositionRobot pos,
     return ActionNavigation::TournerDroite;
   }
 
-  // Avancer vers le waypoint courant (avec dépassement automatique)
-  while (g_indexWaypoint < g_nbWaypoints) {
-    const float dx = g_waypoints[g_indexWaypoint].xCm - pos.x;
-    const float dy = g_waypoints[g_indexWaypoint].yCm - pos.y;
+  // Avancer vers le waypoint courant et passer automatiquement au suivant si atteint
+  float dx, dy;
+  do {
+    dx = g_waypoints[g_indexWaypoint].xCm - pos.x;
+    dy = g_waypoints[g_indexWaypoint].yCm - pos.y;
     if (dx * dx + dy * dy < SEUIL_WAYPOINT_CM * SEUIL_WAYPOINT_CM) {
-      g_indexWaypoint++; // Waypoint atteint
+      g_indexWaypoint++;
     } else {
       break;
     }
-  }
+  } while (g_indexWaypoint < g_nbWaypoints);
+
   if (navigationNettoyageFini()) return ActionNavigation::ArretSecurite;
 
-  // Calculer l'angle vers le prochain waypoint
-  const float dx = g_waypoints[g_indexWaypoint].xCm - pos.x;
-  const float dy = g_waypoints[g_indexWaypoint].yCm - pos.y;
+  // Calculer l'angle vers le prochain waypoint (dx/dy déjà à jour)
   float erreurAngle = atan2f(dy, dx) - pos.angle;
 
   // Normaliser dans [-π, π]
