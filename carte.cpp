@@ -46,6 +46,12 @@ uint8_t carteLireCase(int xChunk, int yChunk) {
   return g_grille[xChunk][yChunk];
 }
 
+void carteSetCase(int xChunk, int yChunk, uint8_t valeur) {
+  if (xChunk >= 0 && xChunk < LARGEUR_CARTE && yChunk >= 0 && yChunk < LONGUEUR_CARTE) {
+    g_grille[xChunk][yChunk] = valeur;
+  }
+}
+
 int carteLargeur() { return LARGEUR_CARTE; }
 int carteLongueur() { return LONGUEUR_CARTE; }
 
