@@ -7,18 +7,20 @@
 #include "config.h"
 #include "debug.h"
 #include "imu.h"
+#include "modes.h"
 #include "moteurs.h"
 #include "navigation.h"
 #include "odometrie.h"
+#include "stockage.h"
 #include "ultrasons.h"
 
 // Mutex FreeRTOS pour protéger l'accès au port Serial (multicœur)
 SemaphoreHandle_t mutexSerial = NULL;
 
-// Tâche de cartographie en arrière-plan (FreeRTOS)
+// Tâche de cartographie en arrière-plan (FreeRTOS – Core 0)
 void tacheCartographie(void* parameter) {
-  for (;;) { // Boucle infinie
-    float dist = odometrieDistanceDepuisDerniereLectureCm();
+  for (;;) {
+    float dist  = odometrieDistanceDepuisDerniereLectureCm();
     float angle = imuLireYawRad();
 
     // Met à jour la position sur la carte
@@ -30,13 +32,12 @@ void tacheCartographie(void* parameter) {
       carteMarquerObstacleDevant(distanceObstacle, angle);
     }
 
-    // On récupère TOUJOURS la position
     PositionRobot pos = carteGetPosition();
-    
-    // Calcul du niveau de batterie en pourcentage (0-100%)
+
+    // Calcul du niveau de batterie en pourcentage (0–100 %)
     float tensionBatterie = batterieLireTension();
-    float niveauBatterie = ((tensionBatterie - BATTERIE_TENSION_MIN) / 
-                            (BATTERIE_TENSION_MAX - BATTERIE_TENSION_MIN)) * 100.0f;
+    float niveauBatterie  = ((tensionBatterie - BATTERIE_TENSION_MIN) /
+                             (BATTERIE_TENSION_MAX - BATTERIE_TENSION_MIN)) * 100.0f;
     niveauBatterie = constrain(niveauBatterie, 0.0f, 100.0f);
 
     if (DEBUG_ACTIF) {
@@ -47,52 +48,66 @@ void tacheCartographie(void* parameter) {
                  + " bat=" + String(niveauBatterie, 0) + "%";
       debugLog(log);
     }
-    
-    // On envoie TOUJOURS les données en direct au téléphone (avec la batterie) !
-    communicationEnvoyerMiseAJour(pos, distanceObstacle, niveauBatterie);
 
-    vTaskDelay(50 / portTICK_PERIOD_MS); // Pause de 50ms (non-bloquante)
+    communicationEnvoyerMiseAJour(pos, distanceObstacle, niveauBatterie,
+                                  aspirationEstActive());
+
+    vTaskDelay(50 / portTICK_PERIOD_MS);
   }
 }
 
-void appliquerAction(ActionNavigation action) {
+// -----------------------------------------------------------------------
+// Helpers de déplacement
+// -----------------------------------------------------------------------
+
+// Applique une action de navigation (avec ou sans aspiration)
+void appliquerAction(ActionNavigation action, bool avecAspiration) {
   switch (action) {
     case ActionNavigation::Avancer:
       moteursAvancer();
-      aspirationDemarrer();
       break;
-
     case ActionNavigation::Reculer:
       moteursReculer();
-      aspirationDemarrer();
       break;
-
     case ActionNavigation::TournerGauche:
       moteursTournerGauche();
-      aspirationDemarrer();
       break;
-
     case ActionNavigation::TournerDroite:
       moteursTournerDroite();
-      aspirationDemarrer();
       break;
-
     case ActionNavigation::ArretSecurite:
+    default:
       moteursStop();
       aspirationArreter();
-      break;
+      return;
   }
+  if (avecAspiration) aspirationDemarrer();
+  else                aspirationArreter();
 }
 
-void setup() {
-  Serial.begin(115200); // L'ESP32 préfère 115200 à 9600
-  
-  // Création du Mutex pour protéger le port Serial (accès concurrent des 2 cores)
-  mutexSerial = xSemaphoreCreateMutex();
-  
-  debugLog("=== Démarrage Robot Aspirateur Cartographe ===");
+// Applique une commande manuelle (Mode Manuel)
+void appliquerCommandeManuelle(CommandeManuelle cmd, bool avecAspiration) {
+  switch (cmd) {
+    case CommandeManuelle::Avancer:       moteursAvancer();      break;
+    case CommandeManuelle::Reculer:       moteursReculer();      break;
+    case CommandeManuelle::TournerGauche: moteursTournerGauche(); break;
+    case CommandeManuelle::TournerDroite: moteursTournerDroite(); break;
+    case CommandeManuelle::Stop:
+    default:                              moteursStop();          break;
+  }
+  if (avecAspiration) aspirationDemarrer();
+  else                aspirationArreter();
+}
 
-  // 1. Initialisation de tous les modules
+// -----------------------------------------------------------------------
+// setup()
+// -----------------------------------------------------------------------
+void setup() {
+  Serial.begin(115200);
+  mutexSerial = xSemaphoreCreateMutex();
+
+  debugLog("=== Demarrage Robot Aspirateur Cartographe ===");
+
   moteursInit();
   aspirationInit();
   batterieInit();
@@ -101,48 +116,105 @@ void setup() {
   imuInit();
   ultrasonsInit();
   carteInit();
-  communicationInit(); // Lance le Wi-Fi et l'App Web
+  stockageInit();
+  communicationInit();
   navigationInit();
 
-  // 2. Création de la tâche de cartographie (tourne en arrière-plan)
   xTaskCreatePinnedToCore(
-    tacheCartographie,   // Fonction à exécuter
-    "Carto",             // Nom
-    4096,                // Taille de la pile en octets
-    NULL,                // Paramètres
-    1,                   // Priorité
-    NULL,                // Identifiant de tâche
-    0                    // Exécuté sur le Core 0
+    tacheCartographie, "Carto",
+    4096, NULL, 1, NULL, 0
   );
 
-  debugLog("=== Initialisation terminée, démarrage navigation ===");
+  debugLog("=== Initialisation terminee, en attente d'ordres ===");
 }
 
+// -----------------------------------------------------------------------
+// loop() – machine à états des 4 modes (Core 1)
+// -----------------------------------------------------------------------
 void loop() {
-  // Nettoie la mémoire des anciens téléphones déconnectés
   communicationCleanupClients();
-  
-  // Vérifie si le robot est autorisé à fonctionner (contrôle depuis l'interface Web)
-  if (!communicationRobotEnMarche()) {
-    moteursStop();
-    aspirationArreter();
-    vTaskDelay(200 / portTICK_PERIOD_MS);
-    return; // Ne rien faire tant que l'utilisateur n'a pas cliqué sur "Démarrer"
-  }
-  
-  EtatCapteurs etat = capteursLire();
-  bool batterieFaible = batterieEstFaible();
 
-  ActionNavigation action = navigationChoisirAction(etat, batterieFaible);
-  appliquerAction(action);
+  // --- Traitement des demandes de persistance (LittleFS) ---
+  char nomPiece[33];
+
+  if (communicationSauvegarderDemande(nomPiece, sizeof(nomPiece))) {
+    stockageSauvegarderCarte(nomPiece);
+    communicationAcquitterSauvegarde();
+  }
+
+  if (communicationChargerDemande(nomPiece, sizeof(nomPiece))) {
+    if (stockageChargerCarte(nomPiece)) {
+      navigationInitNettoyage();
+      debugLog("[MAIN] Carte chargee et parcours calcule : " + String(nomPiece));
+    }
+    communicationAcquitterChargement();
+  }
+
+  if (communicationListePiecesDemandee()) {
+    String liste = stockageListerPieces();
+    communicationEnvoyerListePieces(liste);
+    communicationAcquitterListePieces();
+  }
+
+  // --- Lecture des capteurs et de la batterie ---
+  const EtatCapteurs etat         = capteursLire();
+  const bool         batterieFaible = batterieEstFaible();
+
+  // --- Machine à états des modes ---
+  switch (communicationGetMode()) {
+
+    // ── Mode 0 : Veille ──────────────────────────────────────────────
+    case ModeRobot::Veille:
+      moteursStop();
+      aspirationArreter();
+      break;
+
+    // ── Mode 1 : Manuel ──────────────────────────────────────────────
+    case ModeRobot::Manuel: {
+      CommandeManuelle cmd = communicationGetCommandeManuelle();
+      bool asp             = communicationGetAspirationManuelle();
+      appliquerCommandeManuelle(cmd, asp);
+      break;
+    }
+
+    // ── Mode 2 : Découverte ──────────────────────────────────────────
+    case ModeRobot::Decouverte: {
+      if (batterieFaible) {
+        moteursStop();
+        aspirationArreter();
+      } else {
+        ActionNavigation action = navigationChoisirAction(etat, false);
+        appliquerAction(action, false); // Turbine éteinte en découverte
+      }
+      break;
+    }
+
+    // ── Mode 3 : Nettoyage ───────────────────────────────────────────
+    case ModeRobot::Nettoyage: {
+      if (navigationNettoyageFini()) {
+        // Parcours terminé → retour en veille automatique
+        moteursStop();
+        aspirationArreter();
+        communicationSetMode(ModeRobot::Veille);
+        debugLog("[MAIN] Nettoyage termine ! Retour en veille.");
+      } else {
+        PositionRobot pos    = carteGetPosition();
+        ActionNavigation action =
+            navigationChoisirActionNettoyage(pos, etat, batterieFaible);
+        appliquerAction(action, true); // Turbine allumée en nettoyage
+      }
+      break;
+    }
+  }
 
   if (DEBUG_ACTIF) {
-    String log = "[LOOP] obstacle=" + String(etat.obstacleDevant)
+    String log = "[LOOP] mode=" + String(static_cast<uint8_t>(communicationGetMode()))
+               + " obstacle=" + String(etat.obstacleDevant)
                + " vide=" + String(etat.videDetecte)
-               + " tension=" + String(batterieLireTension(), 2)
-               + "V faible=" + String(batterieFaible);
+               + " tension=" + String(batterieLireTension(), 2) + "V";
     debugLog(log);
   }
 
-  vTaskDelay(200 / portTICK_PERIOD_MS); // Pause non-bloquante de 200ms
+  vTaskDelay(200 / portTICK_PERIOD_MS);
 }
+

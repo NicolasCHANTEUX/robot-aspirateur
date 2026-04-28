@@ -20,6 +20,7 @@ struct PositionRobot {
 void carteInit();
 void carteMarquerLibre(float xCm, float yCm);
 void carteMarquerObstacle(float xCm, float yCm);
+void carteSetCase(int xChunk, int yChunk, uint8_t valeur); // Écriture directe dans la grille (chargement carte)
 uint8_t carteLireCase(int xChunk, int yChunk);
 int carteLargeur();
 int carteLongueur();
