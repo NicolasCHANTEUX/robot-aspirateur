@@ -305,8 +305,7 @@ void communicationInit() {
     if (type == WS_EVT_DATA) {
       AwsFrameInfo *info = (AwsFrameInfo*)arg;
       if (info->final && info->index == 0 && info->len == len && info->opcode == WS_TEXT) {
-        data[len] = 0;
-        String message = String((char*)data);
+        String message = String((char*)data, len);
         
         // Parsing du JSON reçu
         StaticJsonDocument<64> doc;
